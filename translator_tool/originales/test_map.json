@@ -1,0 +1,54 @@
+{
+  "mapName": "My Test Map",
+  "displayName": "Whispering Woods",
+  "parameters": {
+    "bgm": "ForestTheme",
+    "encounterRate": 0.05
+  },
+  "events": [
+    {
+      "id": 1,
+      "name": "OldMan",
+      "type": "npc",
+      "pages": [
+        {
+          "conditions": {},
+          "list": [
+            {"code": 401, "parameters": ["Hello, young adventurer!"]},
+            {"code": 101, "parameters": ["",0,0,2,"Actor1Face"]},
+            {"code": 401, "parameters": ["I have a quest for you."]},
+            {"code": 0}
+          ]
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "name": "Sign",
+      "type": "info",
+      "note": "Beware of goblins ahead!\nThis sign is old.",
+      "pages": [
+        {
+          "list": [
+            {"code": 108, "parameters": ["This is a comment, not shown in game"]},
+            {"code": 401, "parameters": ["The sign reads: 'Danger! Goblins lair ahead.'"]},
+            {"code": 401, "parameters": ["It seems weathered and worn."]}
+          ]
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "description": "A mysterious forest map where players start their journey.",
+    "customData": {
+      "some_internal_code": "DO_NOT_TRANSLATE_THIS_123"
+    }
+  },
+  "pluginNotes": [
+    "<MyPlugin: setup_forest_props>",
+    "Another note that is just a string in a list"
+  ],
+  "scripts": [
+    "console.log('Map Loaded');"
+  ]
+}
