@@ -1,14 +1,18 @@
 import os
 import json
-from googletrans import Translator, LANGUAGES
+# Removed: from googletrans import Translator, LANGUAGES
 import math
 import copy
 import time
+# Removed: import asyncio
+import translators as ts # Added translators import
 
 # --- Configuration ---
 M = 50 # Max line length for formatted text output. Used by the print_neatly function.
 ETR_UPDATE_INTERVAL = 5 # Update Estimated Time Remaining (ETR) every N strings processed.
 ETR_MIN_ITEMS_FOR_ETR_DISPLAY = 1 # Minimum number of items that need to be processed before ETR is displayed for the first time.
+MAX_CHARS_FOR_LOG_SNIPPET = 50 # Max characters for log snippets
+REQUEST_DELAY = 0.1 # Seconds to delay each translation request (used in translate_text)
 
 # --- Configuration for Text Identification ---
 # List of common JSON keys that usually contain translatable text in RPG Maker and similar game JSON structures.
@@ -221,38 +225,45 @@ def parse_and_identify_text(file_path):
         print(f"An unexpected error occurred while parsing {file_path}: {e}")
     return translatable_texts
 
+# Function to translate text using the 'translators' library
 def translate_text(text_to_translate, src_language='en', dest_language='es'):
     """
-    Translates a given text string using the googletrans library.
-
-    Args:
-        text_to_translate (str): The text to be translated.
-        src_language (str, optional): Source language code (e.g., 'en'). Defaults to 'en'.
-        dest_language (str, optional): Destination language code (e.g., 'es'). Defaults to 'es'.
-
-    Returns:
-        str: The translated text, or the original text if translation fails or input is invalid.
+    Translates a given text string using the 'translators' library (defaulting to Bing).
     """
-    # Return original text if input is empty, not a string, or only whitespace
-    if not text_to_translate or not isinstance(text_to_translate, str) or not text_to_translate.strip():
+    if not text_to_translate or not isinstance(text_to_translate, str) or text_to_translate.isspace():
         return text_to_translate
+
     try:
-        translator = Translator()
-        # Basic check for language code validity (though googletrans also handles this)
-        if not all(isinstance(lang, str) and len(lang) >= 2 for lang in [src_language, dest_language]):
-             return text_to_translate # Skip translation if codes seem invalid
+        # Using 'bing' as the translator. Others like 'google', 'mymemory', 'yandex' could also be used.
+        # The 'translators' library handles fetching the translation.
+        # Using REQUEST_DELAY for sleep_seconds to be polite to the API.
+        # Note: time.sleep() is implicitly handled by the library if sleep_seconds > 0.
+        # However, the problem description asks for REQUEST_DELAY to be passed to sleep_seconds.
+        # The library's own time.sleep might be sufficient, but adhering to prompt.
         
-        time.sleep(0.1) # Small delay before each API call to be considerate to the service
+        # The library itself calls time.sleep(sleep_seconds) if sleep_seconds > 0.
+        # So, explicit time.sleep(REQUEST_DELAY) before the call is redundant if REQUEST_DELAY is also passed as sleep_seconds.
+        # I will remove the explicit time.sleep() here as it's handled by the library via sleep_seconds.
+
+        translated_str = ts.translate_text(
+            query_text=text_to_translate,
+            translator='bing', 
+            from_language=src_language,
+            to_language=dest_language,
+            sleep_seconds=REQUEST_DELAY, # Pass the delay here
+            timeout=10.0 # Adding a timeout for robustness
+        )
         
-        translated_obj = translator.translate(text_to_translate, src=src_language, dest=dest_language)
-        if translated_obj and translated_obj.text:
-            return translated_obj.text
+        if translated_str:
+            return translated_str
         else:
-            # If translation result is None or empty, return original text
+            # Handle cases where translation might return None or empty string
+            # without raising an exception.
+            print(f"Warning: Translation for '{text_to_translate[:MAX_CHARS_FOR_LOG_SNIPPET]}...' resulted in empty text using 'bing'. Original text kept.")
             return text_to_translate
+            
     except Exception as e:
-        # Print error on a new line to avoid messing with other console output
-        print(f"\nError during translation of '{text_to_translate[:30]}...': {e}. Original text kept.")
+        print(f"Error during translation of '{text_to_translate[:MAX_CHARS_FOR_LOG_SNIPPET]}...' using 'bing': {e}. Original text kept.")
         return text_to_translate
 
 def print_neatly(text, M_val):
@@ -559,4 +570,3 @@ if __name__ == "__main__":
                 print("No translatable texts found to process across all files.") # If no texts were identified
         else:
             print(f"No JSON files found in '{originales_base_dir}'.") # If no JSON files were found initially
-```

@@ -1,6 +1,6 @@
 {
   "mapName": "My Test Map",
-  "displayName": "Whispering Woods",
+  "displayName": "Bosques Susurrantes",
   "parameters": {
     "bgm": "ForestTheme",
     "encounterRate": 0.05
@@ -8,7 +8,7 @@
   "events": [
     {
       "id": 1,
-      "name": "OldMan",
+      "name": "Anciano",
       "type": "npc",
       "pages": [
         {
@@ -17,7 +17,7 @@
             {
               "code": 401,
               "parameters": [
-                "Hello, young adventurer!"
+                "¡Hola, joven aventurero!"
               ]
             },
             {
@@ -27,13 +27,13 @@
                 0,
                 0,
                 2,
-                "Actor1face"
+                "Actor1Cara"
               ]
             },
             {
               "code": 401,
               "parameters": [
-                "Tengo una búsqueda para ti."
+                "Tengo una misión para ti."
               ]
             },
             {
@@ -45,28 +45,28 @@
     },
     {
       "id": 2,
-      "name": "Firmar",
+      "name": "Señal",
       "type": "información",
-      "note": "¡Tenga cuidado con los duendes por delante!\nEste\nsigno es viejo.",
+      "note": "¡Cuidado con los duendes adelante! Esta señal es\nantigua.",
       "pages": [
         {
           "list": [
             {
               "code": 108,
               "parameters": [
-                "Este es un comentario, no se muestra en el juego"
+                "Este es un comentario, no mostrado en el juego"
               ]
             },
             {
               "code": 401,
               "parameters": [
-                "El letrero dice: '¡Peligro!Goblins Lair por\ndelante."
+                "El letrero dice: '¡Peligro! Guarida de goblins\nadelante.'"
               ]
             },
             {
               "code": 401,
               "parameters": [
-                "Parece desgastado y desgastado."
+                "Parece desgastado y envejecido."
               ]
             }
           ]
@@ -75,7 +75,7 @@
     }
   ],
   "metadata": {
-    "description": "Un misterioso mapa forestal donde los jugadores\ncomienzan su viaje.",
+    "description": "Un mapa de un bosque misterioso donde los\njugadores comienzan su viaje.",
     "customData": {
       "some_internal_code": "DO_NOT_TRANSLATE_THIS_123"
     }
