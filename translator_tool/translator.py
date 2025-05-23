@@ -249,7 +249,7 @@ def translate_text(text_to_translate, src_language='en', dest_language='es'):
             query_text=text_to_translate,
             translator='bing', 
             from_language=src_language,
-            to_language=dest_language,
+            to_language='es-ES', # Changed from 'es' for Bing
             sleep_seconds=REQUEST_DELAY, # Pass the delay here
             timeout=10.0 # Adding a timeout for robustness
         )
