@@ -1,11 +1,12 @@
-1) Whispering Woods
-2) Hello, young adventurer!
-3) I have a quest for you.
-4) Sign
-5) Beware of goblins ahead![NEWLINE]This sign is old.
-6) This is a comment, not shown in game
-7) The sign reads: 'Danger! Goblins lair ahead.'
-8) It seems weathered and worn.
-9) A mysterious forest map where players start their journey.
-10) Another note that is just a string in a list
-11) console.log('Map Loaded');
+1) My Test Map
+2) Whispering Woods
+3) Hello, young adventurer!
+4) I have a quest for you.
+5) Sign
+6) Beware of goblins ahead![NEWLINE]This sign is old.
+7) This is a comment, not shown in game
+8) The sign reads: 'Danger! Goblins lair ahead.'
+9) It seems weathered and worn.
+10) A mysterious forest map where players start their journey.
+11) Another note that is just a string in a list
+12) console.log('Map Loaded');
