@@ -26,13 +26,32 @@
       "id": 2,
       "name": "Sign",
       "type": "info",
-      "note": "Beware of goblins ahead!\nThis sign is old.",
+      "note": "My note for event.\n<pluginCmd: doAction Param=\"ActionName\">\n// Another comment\ncallScript(\"someFunction('param1', 'param2')\");",
       "pages": [
         {
           "list": [
             {"code": 108, "parameters": ["This is a comment, not shown in game"]},
             {"code": 401, "parameters": ["The sign reads: 'Danger! Goblins lair ahead.'"]},
             {"code": 401, "parameters": ["It seems weathered and worn."]}
+          ]
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "name": "ScriptTestEvent",
+      "type": "npc",
+      "note": "Event for testing script call extractions.",
+      "pages": [
+        {
+          "conditions": {},
+          "list": [
+            {"code": 355, "parameters": ["this.sOn(\"B\");\nthis.erase();"]},
+            {"code": 355, "parameters": ["console.log(\"Hello from script! Your var is: \" + $gameVariables.value(1));"]},
+            {"code": 355, "parameters": ["actor.setName(\"New Name for Actor\");"]},
+            {"code": 401, "parameters": ["This is normal text."]},
+            {"code": 401, "parameters": ["this.sOn(\"A\");"]},
+            {"code": 0}
           ]
         }
       ]

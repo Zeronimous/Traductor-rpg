@@ -1,12 +1,18 @@
 1) My Test Map
 2) Whispering Woods
-3) Hello, young adventurer!
-4) I have a quest for you.
-5) Sign
-6) Beware of goblins ahead![NEWLINE]This sign is old.
-7) This is a comment, not shown in game
-8) The sign reads: 'Danger! Goblins lair ahead.'
-9) It seems weathered and worn.
-10) A mysterious forest map where players start their journey.
-11) Another note that is just a string in a list
-12) console.log('Map Loaded');
+3) ForestTheme
+4) OldMan
+5) Hello, young adventurer!
+6) I have a quest for you.
+7) Sign
+8) My note for event.[NEWLINE]<pluginCmd: doAction Param="ActionName">[NEWLINE]// Another comment[NEWLINE]callScript("someFunction('param1', 'param2')");
+9) This is a comment, not shown in game
+10) The sign reads: 'Danger! Goblins lair ahead.'
+11) It seems weathered and worn.
+12) ScriptTestEvent
+13) Event for testing script call extractions.
+14) This is normal text.
+15) A mysterious forest map where players start their journey.
+16) DO_NOT_TRANSLATE_THIS_123
+17) <MyPlugin: setup_forest_props>
+18) Another note that is just a string in a list

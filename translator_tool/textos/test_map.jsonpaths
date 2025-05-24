@@ -1,6 +1,8 @@
 [
   "mapName",
   "displayName",
+  "parameters.bgm",
+  "events.0.name",
   "events.0.pages.0.list.0.parameters.0",
   "events.0.pages.0.list.2.parameters.0",
   "events.1.name",
@@ -8,7 +10,11 @@
   "events.1.pages.0.list.0.parameters.0",
   "events.1.pages.0.list.1.parameters.0",
   "events.1.pages.0.list.2.parameters.0",
+  "events.2.name",
+  "events.2.note",
+  "events.2.pages.0.list.3.parameters.0",
   "metadata.description",
-  "pluginNotes.1",
-  "scripts.0"
+  "metadata.customData.some_internal_code",
+  "pluginNotes.0",
+  "pluginNotes.1"
 ]

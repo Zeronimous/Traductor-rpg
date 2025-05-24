@@ -38,64 +38,127 @@ def is_valid_string(text_val):
     """
     return isinstance(text_val, str) and text_val.strip() != ""
 
-# More comprehensive looks_like_code_or_path from previous iterations (e.g., Turn 76)
-def looks_like_code_or_path(s_val):
-    if not isinstance(s_val, str):
-        return False
-    s_val_strip = s_val.strip()
-    if not s_val_strip: 
+def extract_quoted_strings(text_block):
+    if not isinstance(text_block, str):
+        return []
+    
+    # Regex for double-quoted strings, handling escaped double quotes
+    double_quoted_pattern = r'"((?:[^"\\]|\\.)*)"'
+    # Regex for single-quoted strings, handling escaped single quotes
+    single_quoted_pattern = r"'((?:[^'\\]|\\.)*)'"
+    
+    found_strings = []
+    
+    # Find all double-quoted strings
+    for match in re.finditer(double_quoted_pattern, text_block):
+        try:
+            # Group 1 contains the content within the quotes
+            # Attempt to decode standard Python string escapes (e.g., \n, \t, \xHH, \uHHHH, \UHHHHHHHH)
+            # The 'unicode_escape' codec is good for this.
+            # We need to encode to a byte string first, as decode expects bytes.
+            unescaped_str = match.group(1).encode('latin-1', 'backslashreplace').decode('unicode_escape')
+            found_strings.append(unescaped_str)
+        except UnicodeDecodeError:
+            found_strings.append(match.group(1)) # Append raw if unicode_escape fails
+            
+    # Find all single-quoted strings
+    for match in re.finditer(single_quoted_pattern, text_block):
+        try:
+            unescaped_str = match.group(1).encode('latin-1', 'backslashreplace').decode('unicode_escape')
+            found_strings.append(unescaped_str)
+        except UnicodeDecodeError:
+            found_strings.append(match.group(1))
+
+    return found_strings
+
+# Updated looks_like_code_or_path function
+def looks_like_code_or_path(text_input):
+    if not isinstance(text_input, str):
+        return False 
+    
+    text = text_input.strip()
+    if not text:
         return False
 
-    common_extensions = [".png", ".jpg", ".ogg", ".wav", ".json", ".txt", ".mv", ".mz"]
-    if any(ext in s_val_strip.lower() for ext in common_extensions) and ('/' in s_val_strip or '\\' in s_val_strip or s_val_strip.count('.') > 1):
+    # Rule out obvious text first
+    if ' ' in text and text[-1] in '.?!¡¿':
+        if text[0].isupper() or text[0] in '¡¿"\'': # Note: Corrected unescaped single quote from prompt
+            if not (re.search(r'[=\[\]{}();]', text) or 
+                    '//' in text or '/*' in text or '*/' in text or 
+                    text.startswith("this.") or text.startswith("$game") or 
+                    re.search(r'\b(function|var|let|const|return|if|else|for|while)\b', text)):
+                return False
+
+    # Path / File extensions
+    if re.search(r'\.(png|jpg|jpeg|gif|ogg|mp3|wav|json|txt|dll|exe|js|py|rb|html|css|yaml|ini|dat|ttf|woff|woff2)$', text, re.IGNORECASE):
         return True
-    if "img/" in s_val_strip or "audio/" in s_val_strip or "data/" in s_val_strip or "js/" in s_val_strip:
+    if re.search(r'(^|\s)[a-zA-Z]:\\', text) or re.search(r'^(/|\\|\.\./|\.~([\\/]))', text): # Windows/Unix paths (note: fixed regex for \.~/)
         return True
-    if s_val_strip.startswith("<") and s_val_strip.endswith(">"): # RPG Maker style tags
+    if text.startswith("img/") or text.startswith("audio/") or text.startswith("data/") or text.startswith("js/") or text.startswith("effects/") or text.startswith("fonts/"):
         return True
-    if "$" in s_val_strip or "variable[" in s_val_strip or "switch[" in s_val_strip or "item[" in s_val_strip or "selfSwitch[" in s_val_strip: # Script/variable patterns
+
+    # Plugin tags
+    if re.fullmatch(r'<[^<>:]+:[^<>]*>', text) or re.fullmatch(r'<[^<>]+>', text): # Simpler second part for <tag>
         return True
-    if "DataManager." in s_val_strip or "SceneManager." in s_val_strip or "BattleManager." in s_val_strip: # Common JS classes
+
+    # RPG Maker specific script calls / patterns
+    if text.startswith("this._") or (text.startswith("this.") and '(' in text and ')' in text and not text.split('(')[0].count(' ') > 0):
+        return True
+    if text.startswith(("$game", "Game_Interpreter.prototype.", "SceneManager.", "DataManager.", "Window_", "Sprite_")): # Made tuple
+        if '.' in text or '(' in text: 
+            return True
+    if re.search(r"\b(eval|setTimeout|setInterval|clearInterval|clearTimeout)\(", text): # Escaped (
+        return True
+
+    # JavaScript keywords
+    js_keywords_indicators = ['function', 'var ', 'let ', 'const ', 'return ', 'if (', 'else {', 'for (', 'while (', 'switch (', 'case ', '.prototype', '=>']
+    if any(kw in text for kw in js_keywords_indicators):
         return True
     
-    # Check for dot notation if it's not part of a sentence (e.g. "Plugin.command" vs "Hello. World.")
-    # This heuristic checks if there are no spaces immediately around the dot(s).
-    if s_val_strip.count('.') > 0:
-        parts = s_val_strip.split('.')
-        is_code_like_dot_notation = True
-        if len(parts) > 1 : # Ensure there's at least one dot to make two parts
-            for i, part in enumerate(parts):
-                if i == 0 and part.endswith(' '): # space before dot: "example ."
-                    is_code_like_dot_notation = False; break
-                if i == len(parts) -1 and part.startswith(' '): # space after dot: ". example"
-                    is_code_like_dot_notation = False; break
-                if i > 0 and i < len(parts) -1 and (part.startswith(' ') or part.endswith(' ')): # space around dot: ". example ."
-                    is_code_like_dot_notation = False; break
-            if is_code_like_dot_notation and not any(' ' in p for p in parts): # If no spaces within parts either
-                 if s_val_strip.count('.') > 1: # Typically, multiple dots without spaces are code.
-                    return True
-
-
-    # Refined camelCase/PascalCase check
-    if ' ' not in s_val_strip and '(' not in s_val_strip and ')' not in s_val_strip and ':' not in s_val_strip:
-        if s_val_strip[0].islower() and any(c.isupper() for c in s_val_strip[1:]) and not s_val_strip.isupper() and not s_val_strip.islower():
-            return True # camelCase like myVariableName
-        if s_val_strip[0].isupper() and any(c.islower() for c in s_val_strip[1:]) and any(c.isupper() for c in s_val_strip[1:]) and not s_val_strip.isupper():
-             # PascalCase with multiple caps, not just a single capitalized word like "Chase"
-             # Example: "MyObjectProperty", but not "Name" or "Title" (those are usually in COMMON_TEXT_KEYS)
-             if len([c for c in s_val_strip if c.isupper()]) > 1: # Ensure more than one cap for this rule
+    # Assignments
+    if re.match(r'^[a-zA-Z_$.][a-zA-Z0-9_$.]*\s*=[^=]', text): 
+        return True
+       
+    # Function calls
+    # Check for word characters, then optional dot and more word characters, then optional spaces, then parentheses.
+    # Avoids matching things like "Name (Nickname):"
+    if re.match(r'^[a-zA-Z_$\s][a-zA-Z0-9_$.]*\s*\([^)]*\)$', text) and not text.split('(')[0].strip().count(' ') > 1: # if there are many spaces before '(', it's likely text
+        # Further check if the part before parenthesis is a common function name pattern (no spaces)
+        func_name_part = text.split('(')[0].strip()
+        if not (' ' in func_name_part or func_name_part.endswith(':')) :
+             # Avoid flagging simple user text like "Objective (Optional):"
+            if not (func_name_part.endswith(":") and text.endswith(":") and text.count(":") == 1):
                 return True
-
-
-    if "_" in s_val_strip and not " " in s_val_strip: # snake_case or ALL_CAPS_SNAKE
-        if all(c.isalnum() or c == '_' for c in s_val_strip):
-            return True
-    if s_val_strip.isdigit(): # Purely digits
+                
+    # Specific patterns to filter
+    if re.fullmatch(r'[A-Z_][A-Z0-9_]{2,}', text): # CONSTANT_CASE, at least 3 chars
         return True
-    if s_val_strip.startswith(" سید") or s_val_strip.endswith("سید "): # Specific non-English example from a test case
+    # WordNumberWord or WordNumber - e.g. Actor1Face, Item2, Var5
+    if re.fullmatch(r'[a-zA-Z]+[0-9]+[a-zA-Z0-9]*', text) and not ' ' in text:
         return True
-        
+    
+    # PascalCase or camelCase (stricter: require at least one lower->upper or upper->lower transition if mixed)
+    # and not a common text pattern.
+    if not ' ' in text and len(text) > 1: # Single word
+        is_pascal = text[0].isupper() and any(c.islower() for c in text[1:]) and any(c.isupper() for c in text[1:])
+        is_camel = text[0].islower() and any(c.isupper() for c in text[1:])
+        if (is_pascal or is_camel) and len(text) < 20: # Shorter likely to be identifiers
+             # Avoid flagging single capitalized words like "Chase" or "Hello" if they are common.
+            if text.lower() not in ['name', 'text', 'desc', 'description', 'title', 'message', 'label', 'caption', 'profile', 'note', 'event', 'actor', 'item', 'skill', 'class', 'enemy', 'troop', 'state', 'system', 'map']:
+                return True
+                
+    # High ratio of non-alphanumeric (excluding common text punctuation)
+    # Allow: a-z A-Z 0-9 space . ? ! ¡ ¿ - ' " ( ) : ; , % \ (for RPG Maker codes like \C[1])
+    allowed_text_chars_pattern = r'[a-zA-Z0-9\s\.,!\?\-'"\(\):;%\\]' # Note: removed ¡¿ from allowed for this specific regex
+    non_text_chars = re.sub(allowed_text_chars_pattern, '', text)
+    if len(text) > 0 and len(non_text_chars) > len(text) * 0.35 and len(text) > 3: 
+        return True
+       
+    if text in ['true', 'false', 'null', 'undefined']:
+        return True
+
     return False
+
 
 # --- Specialized Extraction Functions ---
 
@@ -113,9 +176,16 @@ def extract_text_from_map_events(map_events_list, base_event_list_path_parts, fo
         if "name" in DATABASE_KEYS_TO_EXTRACT and is_valid_string(event_name) and not looks_like_code_or_path(event_name):
              found_strings.append({"path": ".".join(current_event_path_base + ["name"]), "original": event_name})
         
-        event_note = event_obj.get("note")
-        if "note" in DATABASE_KEYS_TO_EXTRACT and is_valid_string(event_note) and not looks_like_code_or_path(event_note):
-             found_strings.append({"path": ".".join(current_event_path_base + ["note"]), "original": event_note})
+        original_note = event_obj.get("note")
+        if "note" in DATABASE_KEYS_TO_EXTRACT and is_valid_string(original_note):
+            quoted_texts = extract_quoted_strings(original_note)
+            if quoted_texts:
+                for i_q, q_text in enumerate(quoted_texts): # Process each quoted string individually
+                    if is_valid_string(q_text) and not looks_like_code_or_path(q_text):
+                        found_strings.append({"path": ".".join(current_event_path_base + ["note", f"q_{i_q}"]), "original": q_text})
+            elif not looks_like_code_or_path(original_note): # If no usable quoted strings, check the whole note
+                 found_strings.append({"path": ".".join(current_event_path_base + ["note"]), "original": original_note})
+
 
         pages = event_obj.get("pages")
         if not isinstance(pages, list):
@@ -138,43 +208,44 @@ def extract_text_from_map_events(map_events_list, base_event_list_path_parts, fo
                 code = command_obj.get("code")
                 parameters = command_obj.get("parameters")
                 current_command_path_base = current_command_list_path_base + [str(cmd_idx)]
-                
                 parameter_path_base = current_command_path_base + ["parameters"]
 
-                # Specific event command handling
                 handled_specific_event = False
-                if code in [401, 405] and isinstance(parameters, list) and len(parameters) > 0: # Show Text, Show Scrolling Text
+                if code in [401, 405] and isinstance(parameters, list) and len(parameters) > 0: 
                     text_val = parameters[0]
                     if is_valid_string(text_val) and not looks_like_code_or_path(text_val):
                         found_strings.append({"path": ".".join(parameter_path_base + ["0"]), "original": text_val})
                     handled_specific_event = True
                 
-                elif code == 102 and isinstance(parameters, list) and len(parameters) > 0 and isinstance(parameters[0], list): # Show Choices
+                elif code == 102 and isinstance(parameters, list) and len(parameters) > 0 and isinstance(parameters[0], list): 
                     choices_list = parameters[0]
                     for choice_idx, choice_text in enumerate(choices_list):
                         if is_valid_string(choice_text) and not looks_like_code_or_path(choice_text):
                             found_strings.append({"path": ".".join(parameter_path_base + ["0", str(choice_idx)]), "original": choice_text})
                     handled_specific_event = True 
                 
-                elif code in [108, 408] and isinstance(parameters, list) and len(parameters) > 0: # Comment
+                elif code in [108, 408] and isinstance(parameters, list) and len(parameters) > 0: 
                     comment_text = parameters[0]
-                    if is_valid_string(comment_text) and not looks_like_code_or_path(comment_text): # Only add if not code-like
+                    if is_valid_string(comment_text) and not looks_like_code_or_path(comment_text):
                         found_strings.append({"path": ".".join(parameter_path_base + ["0"]), "original": comment_text})
                     handled_specific_event = True
+                
+                elif code in [355, 655] and isinstance(parameters, list) and len(parameters) > 0 and isinstance(parameters[0], str): 
+                    script_content_full = parameters[0]
+                    quoted_texts = extract_quoted_strings(script_content_full)
+                    if quoted_texts:
+                        for i_q, q_text in enumerate(quoted_texts): # Process each quoted string
+                             if is_valid_string(q_text) and not looks_like_code_or_path(q_text):
+                                found_strings.append({"path": ".".join(parameter_path_base + ["0", f"script_content_q{i_q}"]), "original": q_text})
+                    handled_specific_event = True
 
-                # Generic scan of parameters for this command (if not specifically handled or if it can have more text)
-                if isinstance(parameters, list):
+                if isinstance(parameters, list) and not handled_specific_event:
                     for param_idx, param_val in enumerate(parameters):
-                        if handled_specific_event and param_idx == 0 : # Avoid double-adding param[0] for handled events
-                            # For choices (102), param[0] is the list of choices, already iterated.
-                            # Other params for 102 (like param[1] for cancel type) could still be strings.
-                            if code == 102: continue # Skip all params for 102 in this generic scan for now
-                        
                         if isinstance(param_val, str) and is_valid_string(param_val) and \
                            not looks_like_code_or_path(param_val) and \
                            len(param_val) >= MIN_STRING_LENGTH_GENERIC and not param_val.isdigit():
                             found_strings.append({"path": ".".join(parameter_path_base + [str(param_idx)]), "original": param_val})
-                        elif isinstance(param_val, (dict,list)): # Recurse for complex parameters
+                        elif isinstance(param_val, (dict,list)):
                             extract_text_from_general_structure(param_val, parameter_path_base + [str(param_idx)], found_strings)
 
 
@@ -187,13 +258,23 @@ def extract_text_from_database_object_array(data_array, found_strings):
             continue
         base_path = [str(i)]
         for key in DATABASE_KEYS_TO_EXTRACT:
-            if "." in key: continue # This list is for simple keys at object root
-            text_val = item.get(key)
-            if is_valid_string(text_val) and not looks_like_code_or_path(text_val):
-                found_strings.append({"path": ".".join(base_path + [key]), "original": text_val})
-        # Recursively check other parts of the item for non-standard text structures
+            if "." in key: continue
+            original_value = item.get(key)
+
+            if key == 'note':
+                if is_valid_string(original_value):
+                    quoted_texts = extract_quoted_strings(original_value)
+                    if quoted_texts:
+                        for i_q, q_text in enumerate(quoted_texts): # Process each quoted string
+                            if is_valid_string(q_text) and not looks_like_code_or_path(q_text):
+                                found_strings.append({"path": ".".join(base_path + [key, f"q_{i_q}"]), "original": q_text})
+                    elif not looks_like_code_or_path(original_value):
+                        found_strings.append({"path": ".".join(base_path + [key]), "original": original_value})
+            elif is_valid_string(original_value) and not looks_like_code_or_path(original_value):
+                found_strings.append({"path": ".".join(base_path + [key]), "original": original_value})
+        
         for key, value in item.items():
-            if key not in DATABASE_KEYS_TO_EXTRACT and isinstance(value, (dict,list)): # Avoid re-processing known keys
+            if key not in DATABASE_KEYS_TO_EXTRACT and isinstance(value, (dict,list)):
                  extract_text_from_general_structure(value, base_path + [key], found_strings)
 
 
@@ -201,39 +282,35 @@ def extract_text_from_gallery_list_recursive(element, current_path_parts, found_
     if isinstance(element, dict):
         for key, value in element.items():
             new_path_parts = current_path_parts + [key]
-            if key in GALLERY_KEYS and is_valid_string(value) and not looks_like_code_or_path(value):
+            if key in GALLERY_KEYS and is_valid_string(value) and not looks_like_code_or_path(value): 
                 found_strings.append({"path": ".".join(new_path_parts), "original": value})
             elif isinstance(value, (dict, list)):
                 extract_text_from_gallery_list_recursive(value, new_path_parts, found_strings)
     elif isinstance(element, list):
-        for i, item in enumerate(element):
+        for i, item_val in enumerate(element): 
             new_path_parts = current_path_parts + [str(i)]
-            extract_text_from_gallery_list_recursive(item, new_path_parts, found_strings)
+            extract_text_from_gallery_list_recursive(item_val, new_path_parts, found_strings)
 
 def extract_text_from_rubi_list_recursive(element, current_path_parts, found_strings):
     if isinstance(element, dict):
         for key, value in element.items():
             new_path_parts = current_path_parts + [key]
-            if key in RUBI_TEXT_KEYS and is_valid_string(value) and not looks_like_code_or_path(value):
+            if key in RUBI_TEXT_KEYS and is_valid_string(value) and not looks_like_code_or_path(value): 
                 found_strings.append({"path": ".".join(new_path_parts), "original": value})
             elif isinstance(value, (dict, list)):
                 extract_text_from_rubi_list_recursive(value, new_path_parts, found_strings)
     elif isinstance(element, list):
-        for i, item in enumerate(element):
+        for i, item_val in enumerate(element): 
             new_path_parts = current_path_parts + [str(i)]
-            extract_text_from_rubi_list_recursive(item, new_path_parts, found_strings)
+            extract_text_from_rubi_list_recursive(item_val, new_path_parts, found_strings)
 
 def extract_text_from_general_structure(data, base_path_parts, found_strings):
-    """
-    A generic recursive extractor for unknown structures or parts of known structures.
-    Less precise, relies on string length and `looks_like_code_or_path`.
-    """
     if isinstance(data, dict):
         for key, value in data.items():
-            if key.lower().endswith("name") or key.lower().endswith("title") or key.lower().endswith("text") or key.lower().endswith("desc") or key.lower().endswith("note"):
-                 if is_valid_string(value) and not looks_like_code_or_path(value):
-                      found_strings.append({"path": ".".join(base_path_parts + [key]), "original": value})
-            elif isinstance(value, str) and is_valid_string(value) and not looks_like_code_or_path(value) and len(value) >= 10: # General heuristic for longer strings
+            is_potential_text_key = any(key.lower().endswith(suffix) for suffix in ["name", "title", "text", "desc", "note", "message", "profile", "scenario"])
+            if is_potential_text_key and is_valid_string(value) and not looks_like_code_or_path(value):
+                found_strings.append({"path": ".".join(base_path_parts + [key]), "original": value})
+            elif isinstance(value, str) and is_valid_string(value) and not looks_like_code_or_path(value) and len(value) >= 10: 
                  found_strings.append({"path": ".".join(base_path_parts + [key]), "original": value})
             elif isinstance(value, (dict, list)):
                 extract_text_from_general_structure(value, base_path_parts + [key], found_strings)
@@ -274,8 +351,9 @@ def extract_text_from_json_content(filename, json_content):
         extract_text_from_rubi_list_recursive(json_content, [], found_strings)
 
     elif filename == "System.json" and isinstance(json_content, dict):
-        if is_valid_string(json_content.get("gameTitle")) and not looks_like_code_or_path(json_content.get("gameTitle")):
-            found_strings.append({'path': 'gameTitle', 'original': json_content['gameTitle']})
+        game_title = json_content.get("gameTitle")
+        if is_valid_string(game_title) and not looks_like_code_or_path(game_title):
+            found_strings.append({'path': 'gameTitle', 'original': game_title})
         
         terms = json_content.get("terms")
         if isinstance(terms, dict):
@@ -289,20 +367,19 @@ def extract_text_from_json_content(filename, json_content):
                          if is_valid_string(msg_val) and not looks_like_code_or_path(msg_val):
                              found_strings.append({"path": f"terms.{term_category_key}.{msg_key}", "original": msg_val})
         
-        for key in DATABASE_KEYS_TO_EXTRACT: # For other top-level simple keys
+        for key in DATABASE_KEYS_TO_EXTRACT: 
             if "." in key: continue
             text_val = json_content.get(key)
             if is_valid_string(text_val) and not looks_like_code_or_path(text_val):
                 found_strings.append({"path": key, "original": text_val})
-        # Generic scan for any other text in System.json not covered by above
+        
         extract_text_from_general_structure(json_content, [], found_strings)
 
 
-    elif isinstance(json_content, list): # Default for other database files
+    elif isinstance(json_content, list): 
         extract_text_from_database_object_array(json_content, found_strings)
     
-    elif isinstance(json_content, dict): # For other single-object JSON files
-        # Apply generic scan to the root object
+    elif isinstance(json_content, dict): 
         extract_text_from_general_structure(json_content, [], found_strings)
         
     return found_strings
@@ -331,7 +408,7 @@ def main():
         base_filename_for_dispatch = os.path.basename(file_path)
         print(f"Processing file: {os.path.relpath(file_path, script_dir)}...")
         try:
-            with open(file_path, 'r', encoding='utf-8-sig') as f: # Use utf-8-sig
+            with open(file_path, 'r', encoding='utf-8-sig') as f: 
                 data = json.load(f)
             
             found_strings_for_current_file = extract_text_from_json_content(base_filename_for_dispatch, data)
