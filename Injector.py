@@ -67,31 +67,53 @@ def main():
             print(f"Error: Could not determine path for {json_filename}. Skipping.")
             continue
 
-        # Load translated lines
+        # New parsing logic for multi-line entries
         parsed_translated_lines = []
+        current_entry_text = None  # Holds the accumulating text for the current entry
+
         try:
             with open(text_filepath, 'r', encoding='utf-8') as f_text:
-                for line_num, line in enumerate(f_text):
-                    match = re.match(r"^\d+\) (.*)", line)
-                    if match:
-                        raw_text_from_file = match.group(1).strip()
-                        # Replace literal '\\n' with actual newline character '\n'
-                        restored_text = raw_text_from_file.replace('\\n', '\n')
-                        parsed_translated_lines.append(restored_text)
-                    else:
-                        # Handling for lines that do not match the "N) Text" format.
-                        # These lines are currently skipped as per the stricter approach.
-                        # If they were to be processed, the .replace('\\n', '\n') should also be applied.
-                        if line.strip(): # If the line has content but doesn't match
-                             print(f"Warning: Line {line_num+1} in {text_filepath} ('{line}') does not match 'N) Text' format. Skipping this line.")
-                        # No line is added to parsed_translated_lines if it doesn't match N)
+                for line_num, raw_line in enumerate(f_text):
+                    line = raw_line.strip() # Process stripped lines
+
+                    # Regex to match 'N) Text' or 'N)Text' (optional space after ')')
+                    # Also captures the text part (group 2)
+                    match = re.match(r'^(\d+)\)\s?(.*)', line)
+
+                    if match:  # A new entry starts (e.g., "1) Text")
+                        if current_entry_text is not None:
+                            # If there was a previous entry, add its accumulated text
+                            parsed_translated_lines.append(current_entry_text)
+                        
+                        # Start the new entry with the text part from this line
+                        current_entry_text = match.group(2)
+                    else:  # This line is a continuation of the current entry, or an unexpected line
+                        if current_entry_text is not None:
+                            # Append this line's content to the current entry
+                            # An actual newline character is added to join the lines
+                            current_entry_text += '\n' + line
+                        else:
+                            # This is a non-prefixed line without a preceding entry
+                            # (e.g., at the beginning of the file, or after an empty entry that was just 'N)')
+                            if line: # Only warn if the line has actual content
+                                print(f"Warning: Line {line_num+1} in {text_filepath} ('{line}') is a non-prefixed line without an active entry. Skipping.")
+                
+                # After processing all lines, add the last accumulated entry if it exists
+                if current_entry_text is not None:
+                    parsed_translated_lines.append(current_entry_text)
+
         except Exception as e:
-            print(f"Error reading or parsing {text_filepath}: {e}. Skipping.")
-            continue
+            print(f"Error reading or parsing {text_filepath}: {e}. Skipping file.")
+            # Skip further processing for this file by continuing the outer loop
+            # Ensure parsed_translated_lines is empty so subsequent checks handle this.
+            parsed_translated_lines = [] # Clear any partial data
+            # The 'continue' below will apply to the main loop over text_filename
         
         if not parsed_translated_lines:
-            print(f"No translated lines found in {text_filepath}. Skipping.")
-            continue
+            if os.path.exists(text_filepath): # Only print if file actually existed
+                 print(f"No translated lines successfully parsed from {text_filepath}. Skipping.")
+            # else: file not found error already handled by initial original_json_path check
+            continue # Skip to the next text_filename
 
         translated_lines_iter = iter(parsed_translated_lines)
         
