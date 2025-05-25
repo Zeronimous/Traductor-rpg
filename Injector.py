@@ -74,26 +74,17 @@ def main():
                 for line_num, line in enumerate(f_text):
                     match = re.match(r"^\d+\) (.*)", line)
                     if match:
-                        parsed_translated_lines.append(match.group(1).strip())
+                        raw_text_from_file = match.group(1).strip()
+                        # Replace literal '\\n' with actual newline character '\n'
+                        restored_text = raw_text_from_file.replace('\\n', '\n')
+                        parsed_translated_lines.append(restored_text)
                     else:
-                        # Allow empty lines or lines that don't match the "N) " pattern
-                        # These will effectively be skipped if they were empty during extraction
-                        # or represent structural newlines from the original text that weren't meant to be separate entries.
-                        # If the original extraction logic strictly created N) for every piece of text,
-                        # then a mismatch here indicates a problem with the .txt file.
-                        # For now, we'll be somewhat lenient and just append the stripped line if it's not empty,
-                        # or an empty string if it is, to maintain the count if needed.
-                        # However, the core logic relies on matching non-empty original texts.
-                        stripped_line = line.strip()
-                        # if stripped_line: # Only add if it's not an empty line after stripping N)
-                        #    print(f"Warning: Line {line_num+1} in {text_filepath} ('{line}') does not match 'N) Text' format. Treating as raw text.")
-                        #    parsed_translated_lines.append(stripped_line)
-                        # else:
-                        #    parsed_translated_lines.append("") # Keep index consistent for now
-                        # For a stricter approach:
+                        # Handling for lines that do not match the "N) Text" format.
+                        # These lines are currently skipped as per the stricter approach.
+                        # If they were to be processed, the .replace('\\n', '\n') should also be applied.
                         if line.strip(): # If the line has content but doesn't match
                              print(f"Warning: Line {line_num+1} in {text_filepath} ('{line}') does not match 'N) Text' format. Skipping this line.")
-                        # parsed_translated_lines.append(None) # Or some other placeholder to indicate a skip
+                        # No line is added to parsed_translated_lines if it doesn't match N)
         except Exception as e:
             print(f"Error reading or parsing {text_filepath}: {e}. Skipping.")
             continue

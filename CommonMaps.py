@@ -73,7 +73,9 @@ def main():
                 try:
                     with open(output_filepath, 'w', encoding='utf-8') as f_out:
                         for i, text in enumerate(extracted_texts):
-                            f_out.write(f"{i+1}) {text}\n")
+                            # Replace newline characters with literal '\\n'
+                            processed_text = text.replace('\n', '\\n')
+                            f_out.write(f"{i+1}) {processed_text}\n")
                     print(f"Processed {input_filepath} -> {output_filepath}")
                 except Exception as e:
                     print(f"Error writing to {output_filepath}: {e}")
