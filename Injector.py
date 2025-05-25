@@ -2,6 +2,7 @@ import json
 import os
 import argparse
 import re # For parsing translated lines
+import copy # For deepcopy
 
 def main():
     parser = argparse.ArgumentParser(description="Inject translated texts back into JSON files.")
@@ -28,14 +29,42 @@ def main():
         path_in_comaps = os.path.join(args.comaps_folder, json_filename)
         path_in_otros = os.path.join(args.otros_folder, json_filename)
 
-        if os.path.exists(path_in_comaps):
-            original_json_path = path_in_comaps
-            source_folder = "comaps"
-        elif os.path.exists(path_in_otros):
-            original_json_path = path_in_otros
-            source_folder = "otros"
-        else:
-            print(f"Error: Original JSON file {json_filename} not found in {args.comaps_folder} or {args.otros_folder}. Skipping {text_filename}.")
+        # Define a list of filenames that are typically data files from 'Otros' and should prioritize that folder
+        # This helps prevent using a similarly named (potentially empty) file from 'comaps'
+        known_otros_data_files = [
+            "Actors.json", "Items.json", "Armors.json", "Weapons.json", 
+            "Enemies.json", "Skills.json", "States.json", "MapInfos.json",
+            "Classes.json", "CommonEvents.json", "System.json", "Tilesets.json" # Added more common RPG Maker data files
+        ]
+
+        original_json_path = None
+        source_folder = None
+
+        if json_filename in known_otros_data_files:
+            if os.path.exists(path_in_otros):
+                print(f"Info: Prioritizing 'Otros' folder for known data file: {json_filename}.")
+                original_json_path = path_in_otros
+                source_folder = "otros"
+            elif os.path.exists(path_in_comaps): # Fallback if not in Otros for some reason
+                print(f"Warning: Known data file {json_filename} not found in 'Otros', checking 'comaps'.")
+                original_json_path = path_in_comaps
+                source_folder = "comaps"
+            else:
+                print(f"Error: Known data file {json_filename} not found in {args.otros_folder} or {args.comaps_folder}. Skipping {text_filename}.")
+                continue
+        else: # Standard priority for other files (e.g. MapXXX.json which are expected in comaps)
+            if os.path.exists(path_in_comaps):
+                original_json_path = path_in_comaps
+                source_folder = "comaps"
+            elif os.path.exists(path_in_otros):
+                original_json_path = path_in_otros
+                source_folder = "otros"
+            else:
+                print(f"Error: Original JSON file {json_filename} not found in {args.comaps_folder} or {args.otros_folder}. Skipping {text_filename}.")
+                continue
+        
+        if original_json_path is None: # Should be caught by 'continue' statements above, but as a safeguard
+            print(f"Error: Could not determine path for {json_filename}. Skipping.")
             continue
 
         # Load translated lines
@@ -182,30 +211,62 @@ def main():
                 inject_recursively(data, [], iter_wrapper, is_array_translate_mode=True)
             else: # For other JSON files like Items, Armors, etc.
                 if isinstance(data, list):
-                    for d_item in data:
-                        if d_item is None or not isinstance(d_item, dict): continue
+                    # Make a deep copy for modification; decisions based on original 'data' (which is original_data_list here)
+                    original_data_list = data 
+                    data_to_modify_list = copy.deepcopy(original_data_list)
 
-                        if d_item.get('name') and isinstance(d_item.get('name'), str) and d_item.get('name').strip():
-                            translation = get_next_translation_from_wrapper(iter_wrapper)
-                            if translation is not None: d_item['name'] = translation
-                            else: print(f"Warning: Ran out of translations for {json_filename} (name).")
+                    for idx, d_item_to_modify in enumerate(data_to_modify_list):
+                        # d_item_to_modify is from the deepcopy and will be modified.
+                        # d_item_original is from the original loaded data and is used for decisions.
                         
-                        if d_item.get('description') and isinstance(d_item.get('description'), str) and d_item.get('description').strip():
-                            translation = get_next_translation_from_wrapper(iter_wrapper)
-                            if translation is not None: d_item['description'] = translation
-                            else: print(f"Warning: Ran out of translations for {json_filename} (description).")
+                        if not isinstance(d_item_to_modify, dict): # If original was None or not dict, deepcopy might make it same, or it might be an issue if structure is inconsistent
+                            # Check original item too for consistency in skipping
+                            if idx < len(original_data_list) and (original_data_list[idx] is None or not isinstance(original_data_list[idx], dict)):
+                                continue # Skip if original was also None or not a dict
+                            # If original was dict but copy is not, or vice-versa, could be an issue, but generally deepcopy preserves this.
+                            # For safety, primarily rely on original item for decision to skip.
+                            if idx >= len(original_data_list) or original_data_list[idx] is None or not isinstance(original_data_list[idx], dict):
+                                continue
 
-                        if d_item.get('profile') and isinstance(d_item.get('profile'), str) and d_item.get('profile').strip():
-                            translation = get_next_translation_from_wrapper(iter_wrapper)
-                            if translation is not None: d_item['profile'] = translation
-                            else: print(f"Warning: Ran out of translations for {json_filename} (profile).")
 
-                        for m_idx in range(1, 5): # message1 to message4
+                        d_item_original = original_data_list[idx] # Get corresponding original item
+
+                        # Name field: Decision based on d_item_original
+                        if d_item_original.get('name') and isinstance(d_item_original.get('name'), str) and d_item_original.get('name').strip():
+                            translation = get_next_translation_from_wrapper(iter_wrapper)
+                            if translation is not None:
+                                d_item_to_modify['name'] = translation # Modify the item in the copied list
+                            else:
+                                print(f"Warning: Ran out of translations for {json_filename} (name for item ID {d_item_original.get('id', 'N/A')}).")
+                        
+                        # Description field: Decision based on d_item_original
+                        if d_item_original.get('description') and isinstance(d_item_original.get('description'), str) and d_item_original.get('description').strip():
+                            translation = get_next_translation_from_wrapper(iter_wrapper)
+                            if translation is not None:
+                                d_item_to_modify['description'] = translation # Modify the item in the copied list
+                            else:
+                                print(f"Warning: Ran out of translations for {json_filename} (description for item ID {d_item_original.get('id', 'N/A')}).")
+
+                        # Profile field: Decision based on d_item_original
+                        if d_item_original.get('profile') and isinstance(d_item_original.get('profile'), str) and d_item_original.get('profile').strip():
+                            translation = get_next_translation_from_wrapper(iter_wrapper)
+                            if translation is not None:
+                                d_item_to_modify['profile'] = translation # Modify the item in the copied list
+                            else:
+                                print(f"Warning: Ran out of translations for {json_filename} (profile for item ID {d_item_original.get('id', 'N/A')}).")
+
+                        # Message fields (message1 to message4): Decision based on d_item_original
+                        for m_idx in range(1, 5):
                             msg_key = f'message{m_idx}'
-                            if d_item.get(msg_key) and isinstance(d_item.get(msg_key), str) and d_item.get(msg_key).strip():
+                            if d_item_original.get(msg_key) and isinstance(d_item_original.get(msg_key), str) and d_item_original.get(msg_key).strip():
                                 translation = get_next_translation_from_wrapper(iter_wrapper)
-                                if translation is not None: d_item[msg_key] = translation
-                                else: print(f"Warning: Ran out of translations for {json_filename} ({msg_key}).")
+                                if translation is not None:
+                                    d_item_to_modify[msg_key] = translation # Modify the item in the copied list
+                                else:
+                                    print(f"Warning: Ran out of translations for {json_filename} ({msg_key} for item ID {d_item_original.get('id', 'N/A')}).")
+                    
+                    data = data_to_modify_list # Important: ensure 'data' which is saved later, now points to the modified list
+
                 elif data is None and (json_filename.endswith("Items.json") # etc.
                                      or json_filename.endswith("Armors.json")
                                      or json_filename.endswith("Weapons.json")
@@ -213,7 +274,7 @@ def main():
                                      or json_filename.endswith("Skills.json")
                                      or json_filename.endswith("States.json")
                                      or json_filename.endswith("MapInfos.json")):
-                    pass # No data to inject into
+                    pass # No data to inject into, or data is not a list as expected for these file types
 
         # Check if there are any remaining unused translations
         remaining_translations = list(iter_wrapper[0] if source_folder == "otros" else translated_lines_iter)
